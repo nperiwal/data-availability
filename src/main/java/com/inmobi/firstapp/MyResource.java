@@ -149,20 +149,16 @@ public class MyResource {
         calendar.set(Calendar.SECOND, 0);
 
         DateFormat formatter = new SimpleDateFormat("yyyyMMdd");
-        //formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
         String conduitDay = formatter.format(calendar.getTime());
 
         formatter = new SimpleDateFormat("yyyy-MM-dd");
-        //formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
         String day = formatter.format(calendar.getTime());
         int currentHour = calendar.get(Calendar.HOUR_OF_DAY);
 
         formatter = new SimpleDateFormat("yyyy-MM-dd HH:00:00");
-        //formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
         String verticaHour = formatter.format(calendar.getTime());
 
         formatter = new SimpleDateFormat("yyyy-MM-dd-HH");
-        //formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
 
         String fullHour = "";
         String auditSum = "";
@@ -180,21 +176,21 @@ public class MyResource {
             c.setAutoCommit(false);
 
             stmt = c.createStatement();
-            ResultSet rs = stmt.executeQuery("select sum(c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + " +
+            ResultSet rs = stmt.executeQuery("select (timeinterval/(1000*60*60))%24 as hour,sum(c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + " +
                     "c15 + c30 + c60 + c120 + c240 + c600) from daily_conduit_summary" + conduitDay + " where topic like " +
                     "'rr' and tier='LOCAL' and (timeinterval/(1000*60*60))%24 >= 0 and " +
                     "(timeinterval/(1000*60*60))%24 <= " + currentHour + " group by (timeinterval/(1000*60*60))%24 " +
                     "order by (timeinterval/(1000*60*60))%24;");
 
             s += "3\n";
-            int hour = 0;
             while ( rs.next() ) {
                 s += "4\n";
+                int hour = Integer.parseInt(rs.getString("hour"));
                 auditSum = rs.getString("sum");
                 if (StringUtils.isBlank(auditSum)) {
                     auditSum = "0";
                 }
-                calendar.set(Calendar.HOUR_OF_DAY, hour++);
+                calendar.set(Calendar.HOUR_OF_DAY, hour);
                 fullHour = formatter.format(calendar.getTime());
                 Result result = new Result(fullHour, auditSum, "", "NA");
                 resultMap.put(fullHour, result);
@@ -219,16 +215,16 @@ public class MyResource {
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
-                    ("select sum(page_requests) from hour_supply_fact where event_time>= '"+ day + " 00:00:00' and " +
+                    ("select event_time,sum(page_requests) from hour_supply_fact where event_time>= '"+ day + " 00:00:00' and " +
                             "event_time<= '" + verticaHour + "' group by event_time order by event_time;");
 
-            int hour = 0;
             while (myResult.next()) {
-                verticaSum = myResult.getString(1);
+                int hour = Integer.parseInt(myResult.getString(1).substring(11,13));
+                verticaSum = myResult.getString(2);
                 if (StringUtils.isBlank(verticaSum)) {
                     verticaSum = "0";
                 }
-                calendar.set(Calendar.HOUR_OF_DAY, hour++);
+                calendar.set(Calendar.HOUR_OF_DAY, hour);
                 fullHour = formatter.format(calendar.getTime());
                 Result result = resultMap.get(fullHour);
                 result.setVertica(verticaSum);
@@ -305,19 +301,19 @@ public class MyResource {
             c.setAutoCommit(false);
 
             stmt = c.createStatement();
-            ResultSet rs = stmt.executeQuery("select sum(c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + " +
+            ResultSet rs = stmt.executeQuery("select (timeinterval/(1000*60*60))%24 as hour,sum(c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + " +
                     "c15 + c30 + c60 + c120 + c240 + c600) from daily_conduit_summary" + conduitDay + " where topic like " +
                     "'rr' and tier='LOCAL' group by (timeinterval/(1000*60*60))%24 order by (timeinterval/(1000*60*60))%24;");
 
             s += "3\n";
-            int hour = 0;
             while ( rs.next() ) {
                 s += "4\n";
+                int hour = Integer.parseInt(rs.getString("hour"));
                 auditSum = rs.getString("sum");
                 if (StringUtils.isBlank(auditSum)) {
                     auditSum = "0";
                 }
-                calendar.set(Calendar.HOUR_OF_DAY, hour++);
+                calendar.set(Calendar.HOUR_OF_DAY, hour);
                 fullHour = formatter.format(calendar.getTime());
                 Result result = new Result(fullHour, auditSum, "", "NA");
                 resultMap.put(fullHour, result);
@@ -342,23 +338,28 @@ public class MyResource {
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
-                    ("select sum(page_requests) from hour_supply_fact where event_time>= '"+ day + " 00:00:00' and " +
-                            "event_time<= '" + day + " 23:00:00' group by event_time order by event_time;");
+                    ("select event_time,sum(page_requests) from hour_supply_fact where event_time >= '"+ day + " 00:00:00' and " +
+                            "event_time <= '" + day + " 23:00:00' group by event_time order by event_time;");
 
-            int hour = 0;
+            s += "7\n";
             while (myResult.next()) {
-                verticaSum = myResult.getString(1);
+                s += "8\n";
+                s += myResult.getString(1) + "\n";
+                int hour = Integer.parseInt(myResult.getString(1).substring(11,13));
+                verticaSum = myResult.getString(2);
                 if (StringUtils.isBlank(verticaSum)) {
                     verticaSum = "0";
                 }
-                calendar.set(Calendar.HOUR_OF_DAY, hour++);
+                calendar.set(Calendar.HOUR_OF_DAY, hour);
                 fullHour = formatter.format(calendar.getTime());
                 Result result = resultMap.get(fullHour);
                 result.setVertica(verticaSum);
+                s += "81\n";
             }
             mySelect.close();
             conn.close();
         } catch (Exception e) {
+            s += "84\n";
             e.printStackTrace();
         }
 
@@ -379,6 +380,7 @@ public class MyResource {
             resultList.add(result);
         }
         s += "9\n";
+        //return s;
         return GSON.toJson(resultList);
     }
 
@@ -390,10 +392,6 @@ public class MyResource {
 
         public String getAudit() {
             return audit;
-        }
-
-        public void setAudit(String audit) {
-            this.audit = audit;
         }
 
         public String getVertica() {
