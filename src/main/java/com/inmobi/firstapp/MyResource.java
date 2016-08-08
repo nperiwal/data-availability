@@ -340,7 +340,7 @@ public class MyResource {
     @Path("day-offset")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getDayAvailabilityWithOffset(@QueryParam("offset") int offset, @QueryParam("stream") String stream) {
+    public String getDayAvailabilityWithOffset1(@QueryParam("offset") int offset, @QueryParam("stream") String stream) {
 
         Map<String, Result> resultMap = new TreeMap<>();
 
