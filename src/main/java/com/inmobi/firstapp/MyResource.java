@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -52,10 +53,14 @@ public class MyResource {
      *
      * @return String that will be returned as an application/json response.
      */
-    @Path("hourly/hour")
+    @Path("{stream}/hourly/hour")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getHourlyAvailability(@QueryParam("full_hour") String fullHour, @QueryParam("stream") String stream) {
+    public String getHourlyAvailability(@QueryParam("full_hour") String fullHour, @PathParam("stream") String stream) {
+
+        if (fullHour == null) {
+            return GSON.toJson("Please supply full_hour query parameter");
+        }
 
         String[] data = fullHour.split("-");
         if (data.length != 4) {
@@ -134,10 +139,10 @@ public class MyResource {
      *
      * @return String that will be returned as an application/json response.
      */
-    @Path("hourly/today")
+    @Path("{stream}/hourly/today")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getTodayAvailability1(@QueryParam("stream") String stream) {
+    public String getTodayAvailability1(@PathParam("stream") String stream) {
         int offset = 0;
         return getDayAvailabilityWithOffset(offset, stream);
     }
@@ -148,10 +153,10 @@ public class MyResource {
      *
      * @return String that will be returned as an application/json response.
      */
-    @Path("hourly/yesterday")
+    @Path("{stream}/hourly/yesterday")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getYesterdayAvailability1(@QueryParam("stream") String stream) {
+    public String getYesterdayAvailability1(@PathParam("stream") String stream) {
         int offset = 1;
         return getDayAvailabilityWithOffset(offset, stream);
 
@@ -163,10 +168,14 @@ public class MyResource {
      *
      * @return String that will be returned as an application/json response.
      */
-    @Path("hourly/day")
+    @Path("{stream}/hourly/day")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getDayAvailability(@QueryParam("date") String full_day, @QueryParam("stream") String stream) {
+    public String getDayAvailability(@QueryParam("date") String full_day, @PathParam("stream") String stream) {
+
+        if (full_day == null) {
+            return GSON.toJson("Please supply date query parameter");
+        }
 
         String[] data = full_day.split("-");
         if (data.length != 3) {
@@ -204,10 +213,10 @@ public class MyResource {
      *
      * @return String that will be returned as an application/json response.
      */
-    @Path("day-offset")
+    @Path("{stream}/hourly/offset")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getDayAvailabilityWithOffset(@QueryParam("offset") int offset, @QueryParam("stream") String stream) {
+    public String getDayAvailabilityWithOffset(@QueryParam("offset") int offset, @PathParam("stream") String stream) {
 
         Map<String, Result> resultMap = new TreeMap<>();
 
@@ -337,12 +346,83 @@ public class MyResource {
      *
      * @return String that will be returned as an application/json response.
      */
-    @Path("day-offset")
+    @Path("{stream}/daily/today")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getDayAvailabilityWithOffset1(@QueryParam("offset") int offset, @QueryParam("stream") String stream) {
+    public String getTodayDailyAvailability1(@PathParam("stream") String stream) {
+        int offset = 0;
+        return getAggregatedDayAvailabilityWithOffset(offset, stream);
+    }
 
-        Map<String, Result> resultMap = new TreeMap<>();
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "application/json" media type.
+     *
+     * @return String that will be returned as an application/json response.
+     */
+    @Path("{stream}/daily/yesterday")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getYesterdayDailyAvailability1(@PathParam("stream") String stream) {
+        int offset = 1;
+        return getAggregatedDayAvailabilityWithOffset(offset, stream);
+
+    }
+
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "application/json" media type.
+     *
+     * @return String that will be returned as an application/json response.
+     */
+    @Path("{stream}/daily/day")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getAggregatedDayAvailability(@QueryParam("date") String full_day, @PathParam("stream") String stream) {
+
+        if (full_day == null) {
+            return GSON.toJson("Please supply date query parameter");
+        }
+        String[] data = full_day.split("-");
+        if (data.length != 3) {
+            return GSON.toJson("Incorrect date parameter. It should be of type YYYY-MM-DD");
+        }
+
+        DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        calendar.add(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        String currentDayString = formatter.format(calendar.getTime());
+
+        long offset;
+        try {
+            Date date1 = formatter.parse(currentDayString);
+            Date date2 = formatter.parse(full_day);
+            long diff = date1.getTime() - date2.getTime();
+            offset = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+            if (offset < 0) {
+                return GSON.toJson("Future date is not allowed.");
+            }
+        } catch (ParseException e) {
+            return GSON.toJson("Incorrect date parameter. It should be of type YYYY-MM-DD");
+        }
+
+        return getAggregatedDayAvailabilityWithOffset((int)offset, stream);
+    }
+
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "application/json" media type.
+     *
+     * @return String that will be returned as an application/json response.
+     */
+    @Path("{stream}/daily/day-offset")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getAggregatedDayAvailabilityWithOffset(@QueryParam("offset") int offset, @PathParam("stream") String stream) {
 
         String s = "";
         s += "offset: " + offset + "\n";
@@ -363,9 +443,6 @@ public class MyResource {
         formatter = new SimpleDateFormat("yyyy-MM-dd");
         String day = formatter.format(calendar.getTime());
 
-        formatter = new SimpleDateFormat("yyyy-MM-dd-HH");
-
-        String fullHour = "";
         String auditSum = "";
         Connection c = null;
         Statement stmt = null;
@@ -381,22 +458,17 @@ public class MyResource {
             c.setAutoCommit(false);
 
             stmt = c.createStatement();
-            ResultSet rs = stmt.executeQuery("select (timeinterval/(1000*60*60))%24 as hour,sum(c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + " +
+            ResultSet rs = stmt.executeQuery("select sum(c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + " +
                     "c15 + c30 + c60 + c120 + c240 + c600) from daily_conduit_summary" + conduitDay + " where topic like " +
-                    "'rr' and tier='LOCAL' group by (timeinterval/(1000*60*60))%24 order by (timeinterval/(1000*60*60))%24;");
+                    "'rr' and tier='LOCAL';");
 
             s += "3\n";
             while ( rs.next() ) {
                 s += "4\n";
-                int hour = Integer.parseInt(rs.getString("hour"));
                 auditSum = rs.getString("sum");
                 if (StringUtils.isBlank(auditSum)) {
                     auditSum = "0";
                 }
-                calendar.set(Calendar.HOUR_OF_DAY, hour);
-                fullHour = formatter.format(calendar.getTime());
-                Result result = new Result(fullHour, auditSum, "", "NA");
-                resultMap.put(fullHour, result);
                 s += "5\n";
             }
             rs.close();
@@ -418,22 +490,17 @@ public class MyResource {
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
-                    ("select event_time,sum(page_requests) from hour_supply_fact where event_time >= '"+ day + " 00:00:00' and " +
-                            "event_time <= '" + day + " 23:00:00' group by event_time order by event_time;");
+                    ("select sum(page_requests) from hour_supply_fact where event_time >= '"+ day + " 00:00:00' and " +
+                            "event_time <= '" + day + " 23:00:00';");
 
             s += "7\n";
             while (myResult.next()) {
                 s += "8\n";
                 s += myResult.getString(1) + "\n";
-                int hour = Integer.parseInt(myResult.getString(1).substring(11,13));
-                verticaSum = myResult.getString(2);
+                verticaSum = myResult.getString(1);
                 if (StringUtils.isBlank(verticaSum)) {
                     verticaSum = "0";
                 }
-                calendar.set(Calendar.HOUR_OF_DAY, hour);
-                fullHour = formatter.format(calendar.getTime());
-                Result result = resultMap.get(fullHour);
-                result.setVertica(verticaSum);
                 s += "81\n";
             }
             mySelect.close();
@@ -443,25 +510,20 @@ public class MyResource {
             e.printStackTrace();
         }
 
-        List<Result> resultList = new ArrayList<>();
-        for (Map.Entry<String, Result> entry : resultMap.entrySet()) {
-            Result result = entry.getValue();
-
-            String availability = "NA";
-            if (StringUtils.isNotBlank(result.getAudit()) && StringUtils.isNotBlank(result.getVertica())) {
-                Long s1 =  Long.parseLong(result.getAudit());
-                Long s2 = Long.parseLong(result.getVertica());
-                if (s1 > 0) {
-                    double percent = Math.round((s2*100d/s1)*100d)/100d;
-                    availability = Double.toString(percent) + "%";
-                }
+        String availability = "NA";
+        if (StringUtils.isNotBlank(auditSum)) {
+            Long s1 =  Long.parseLong(auditSum);
+            Long s2 = Long.parseLong(verticaSum);
+            if (s1 > 0) {
+                double percent = Math.round((s2*100d/s1)*100d)/100d;
+                availability = Double.toString(percent) + "%";
             }
-            result.setAvailability(availability);
-            resultList.add(result);
         }
+
+        Result result = new Result(day, auditSum, verticaSum, availability);
         s += "9\n";
         //return s;
-        return GSON.toJson(resultList);
+        return GSON.toJson(result);
     }
 
     static class Result {
