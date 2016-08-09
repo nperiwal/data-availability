@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -56,7 +57,8 @@ public class MyResource {
     @Path("{stream}/hourly/hour")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getHourlyAvailability(@QueryParam("full_hour") String fullHour, @PathParam("stream") String stream) {
+    public String getHourlyAvailability(@QueryParam("full_hour") String fullHour, @PathParam("stream") String stream,
+                                        @DefaultValue("false") @QueryParam("debug") String debug) {
 
         if (fullHour == null) {
             return GSON.toJson("Please supply full_hour query parameter");
@@ -125,12 +127,22 @@ public class MyResource {
             Long s2 = Long.parseLong(verticaSum);
             if (s1 > 0) {
                 double percent = Math.round((s2*100d/s1)*100d)/100d;
+                if (percent >= 100 && debug.equals("false")) {
+                    percent = 100.0d;
+                }
                 availability = Double.toString(percent) + "%";
             }
         }
 
-        Result result = new Result(fullHour, auditSum, verticaSum, availability);
-        return GSON.toJson(result);
+        if (debug.equals("true")) {
+            Result result = new Result(fullHour, auditSum, verticaSum, availability);
+            return GSON.toJson(result);
+        }
+
+
+
+        ModifiedResult modifiedResult = new ModifiedResult(fullHour, verticaSum, availability);
+        return GSON.toJson(modifiedResult);
     }
 
     /**
@@ -142,9 +154,10 @@ public class MyResource {
     @Path("{stream}/hourly/today")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getTodayAvailability1(@PathParam("stream") String stream) {
+    public String getTodayAvailability1(@PathParam("stream") String stream,
+                                        @DefaultValue("false") @QueryParam("debug") String debug) {
         int offset = 0;
-        return getDayAvailabilityWithOffset(offset, stream);
+        return getDayAvailabilityWithOffset(offset, stream, debug);
     }
 
     /**
@@ -156,9 +169,10 @@ public class MyResource {
     @Path("{stream}/hourly/yesterday")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getYesterdayAvailability1(@PathParam("stream") String stream) {
+    public String getYesterdayAvailability1(@PathParam("stream") String stream,
+                                            @DefaultValue("false") @QueryParam("debug") String debug) {
         int offset = 1;
-        return getDayAvailabilityWithOffset(offset, stream);
+        return getDayAvailabilityWithOffset(offset, stream, debug);
 
     }
 
@@ -171,7 +185,8 @@ public class MyResource {
     @Path("{stream}/hourly/day")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getDayAvailability(@QueryParam("date") String full_day, @PathParam("stream") String stream) {
+    public String getDayAvailability(@QueryParam("date") String full_day, @PathParam("stream") String stream,
+                                     @DefaultValue("false") @QueryParam("debug") String debug) {
 
         if (full_day == null) {
             return GSON.toJson("Please supply date query parameter");
@@ -204,7 +219,7 @@ public class MyResource {
             return GSON.toJson("Incorrect date parameter. It should be of type YYYY-MM-DD");
         }
 
-        return getDayAvailabilityWithOffset((int)offset, stream);
+        return getDayAvailabilityWithOffset((int)offset, stream, debug);
     }
 
     /**
@@ -216,7 +231,8 @@ public class MyResource {
     @Path("{stream}/hourly/offset")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getDayAvailabilityWithOffset(@QueryParam("offset") int offset, @PathParam("stream") String stream) {
+    public String getDayAvailabilityWithOffset(@QueryParam("offset") int offset, @PathParam("stream") String stream,
+                                               @DefaultValue("false") @QueryParam("debug") String debug) {
 
         Map<String, Result> resultMap = new TreeMap<>();
 
@@ -319,25 +335,48 @@ public class MyResource {
             e.printStackTrace();
         }
 
-        List<Result> resultList = new ArrayList<>();
+        if (debug.equals("true")) {
+            List<Result> resultList = new ArrayList<>();
+            for (Map.Entry<String, Result> entry : resultMap.entrySet()) {
+                Result result = entry.getValue();
+
+                String availability = "NA";
+                if (StringUtils.isNotBlank(result.getAudit()) && StringUtils.isNotBlank(result.getVertica())) {
+                    Long s1 = Long.parseLong(result.getAudit());
+                    Long s2 = Long.parseLong(result.getVertica());
+                    if (s1 > 0) {
+                        double percent = Math.round((s2 * 100d / s1) * 100d) / 100d;
+                        availability = Double.toString(percent) + "%";
+                    }
+                }
+                result.setAvailability(availability);
+                resultList.add(result);
+            }
+            return GSON.toJson(resultList);
+        }
+
+        List<ModifiedResult> modifiedResults = new ArrayList<>();
         for (Map.Entry<String, Result> entry : resultMap.entrySet()) {
             Result result = entry.getValue();
 
             String availability = "NA";
             if (StringUtils.isNotBlank(result.getAudit()) && StringUtils.isNotBlank(result.getVertica())) {
-                Long s1 =  Long.parseLong(result.getAudit());
+                Long s1 = Long.parseLong(result.getAudit());
                 Long s2 = Long.parseLong(result.getVertica());
                 if (s1 > 0) {
-                    double percent = Math.round((s2*100d/s1)*100d)/100d;
+                    double percent = Math.round((s2 * 100d / s1) * 100d) / 100d;
+                    if (percent >= 100) {
+                        percent = 100.0d;
+                    }
                     availability = Double.toString(percent) + "%";
                 }
             }
             result.setAvailability(availability);
-            resultList.add(result);
+            ModifiedResult modifiedResult = new ModifiedResult(result.getDate(), result.getVertica(),
+                    result.getAvailability());
+            modifiedResults.add(modifiedResult);
         }
-        s += "9\n";
-        //return s;
-        return GSON.toJson(resultList);
+        return GSON.toJson(modifiedResults);
     }
 
     /**
@@ -349,9 +388,10 @@ public class MyResource {
     @Path("{stream}/daily/today")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getTodayDailyAvailability1(@PathParam("stream") String stream) {
+    public String getTodayDailyAvailability1(@PathParam("stream") String stream,
+                                             @DefaultValue("false") @QueryParam("debug") String debug) {
         int offset = 0;
-        return getAggregatedDayAvailabilityWithOffset(offset, stream);
+        return getAggregatedDayAvailabilityWithOffset(offset, stream, debug);
     }
 
     /**
@@ -363,9 +403,10 @@ public class MyResource {
     @Path("{stream}/daily/yesterday")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getYesterdayDailyAvailability1(@PathParam("stream") String stream) {
+    public String getYesterdayDailyAvailability1(@PathParam("stream") String stream,
+                                                 @DefaultValue("false") @QueryParam("debug") String debug) {
         int offset = 1;
-        return getAggregatedDayAvailabilityWithOffset(offset, stream);
+        return getAggregatedDayAvailabilityWithOffset(offset, stream, debug);
 
     }
 
@@ -378,7 +419,8 @@ public class MyResource {
     @Path("{stream}/daily/day")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getAggregatedDayAvailability(@QueryParam("date") String full_day, @PathParam("stream") String stream) {
+    public String getAggregatedDayAvailability(@QueryParam("date") String full_day, @PathParam("stream") String stream,
+                                               @DefaultValue("false") @QueryParam("debug") String debug) {
 
         if (full_day == null) {
             return GSON.toJson("Please supply date query parameter");
@@ -410,7 +452,7 @@ public class MyResource {
             return GSON.toJson("Incorrect date parameter. It should be of type YYYY-MM-DD");
         }
 
-        return getAggregatedDayAvailabilityWithOffset((int)offset, stream);
+        return getAggregatedDayAvailabilityWithOffset((int)offset, stream, debug);
     }
 
     /**
@@ -422,7 +464,9 @@ public class MyResource {
     @Path("{stream}/daily/day-offset")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String getAggregatedDayAvailabilityWithOffset(@QueryParam("offset") int offset, @PathParam("stream") String stream) {
+    public String getAggregatedDayAvailabilityWithOffset(@QueryParam("offset") int offset,
+                                                         @PathParam("stream") String stream,
+                                                         @DefaultValue("false") @QueryParam("debug") String debug) {
 
         String s = "";
         s += "offset: " + offset + "\n";
@@ -516,14 +560,22 @@ public class MyResource {
             Long s2 = Long.parseLong(verticaSum);
             if (s1 > 0) {
                 double percent = Math.round((s2*100d/s1)*100d)/100d;
+                if (percent >= 100 && debug.equals("false")) {
+                    percent = 100.0d;
+                }
                 availability = Double.toString(percent) + "%";
             }
         }
 
-        Result result = new Result(day, auditSum, verticaSum, availability);
+        ModifiedResult modifiedResult = new ModifiedResult(day, verticaSum, availability);
+        if (debug.equals("true")) {
+            Result result = new Result(day, auditSum, verticaSum, availability);
+            return GSON.toJson(result);
+        }
+
         s += "9\n";
         //return s;
-        return GSON.toJson(result);
+        return GSON.toJson(modifiedResult);
     }
 
     static class Result {
@@ -532,12 +584,20 @@ public class MyResource {
         String vertica;
         String availability;
 
+        public String getDate() {
+            return date;
+        }
+
         public String getAudit() {
             return audit;
         }
 
         public String getVertica() {
             return vertica;
+        }
+
+        public String getAvailability() {
+            return availability;
         }
 
         public void setVertica(String vertica) {
@@ -551,6 +611,18 @@ public class MyResource {
         public Result(String date, String audit, String vertica, String availability) {
             this.date = date;
             this.audit = audit;
+            this.vertica = vertica;
+            this.availability = availability;
+        }
+    }
+
+    static class ModifiedResult {
+        String date;
+        String vertica;
+        String availability;
+
+        public ModifiedResult(String date, String vertica, String availability) {
+            this.date = date;
             this.vertica = vertica;
             this.availability = availability;
         }
