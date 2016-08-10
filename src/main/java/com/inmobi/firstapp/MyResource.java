@@ -28,7 +28,7 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Root resource (exposed at "myresource" path)
+ * Root resource (exposed at "/" path)
  */
 @Path("/")
 public class MyResource {
