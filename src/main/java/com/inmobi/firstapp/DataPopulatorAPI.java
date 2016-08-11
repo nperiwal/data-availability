@@ -171,7 +171,7 @@ public class DataPopulatorAPI {
                     "sum(case when (topic like '%network_click_cp%_lhr1' or topic like '%network_click_cp%_uh1' or topic like '%network_click_cp%_hkg1' or topic like '%network_click_cp%_dfw1' or topic like '%network_click_invalid_lhr1' or topic like '%network_click_invalid_uh1' or topic like '%network_click_invalid_hkg1' or topic like '%network_click_invalid_dfw1') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as click, " +
                     "sum(case when (topic like 'beacon_rr_lhr1_cpc_render' or topic like 'beacon_rr_uh1_cpc_render' or topic like 'beacon_rr_hkg1_cpc_render' or topic like 'beacon_rr_dfw1_cpc_render') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as rendercpc, " +
                     "sum(case when (topic like 'beacon_rr_lhr1_cpm_render' or topic like 'beacon_rr_uh1_cpm_render' or topic like 'beacon_rr_hkg1_cpm_render' or topic like 'beacon_rr_dfw1_cpm_render') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as rendercpm, " +
-                    "sum(case when (topic like 'billing_cp%_lhr1' or topic like 'billing_cp%_uh1' or topic like 'billing_cp%_hkg1' or topic like 'billing_cp%_dfw1' or topic like 'billing_download_lhr1' or topic like 'billing_download_uh1' or topic like 'billing_download_hkg1' or topic like 'billing_download_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as billing " +
+                    "sum(case when (topic like 'billing_cp%_lhr1' or topic like 'billing_cp%_uh1' or topic like 'billing_cp%_hkg1' or topic like 'billing_cp%_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as billing " +
                     "from daily_conduit_summary" + conduitDay + " group by (timeinterval/(1000*60*60))%24 order by (timeinterval/(1000*60*60))%24;");
 
             s += "3\n";
@@ -295,6 +295,243 @@ public class DataPopulatorAPI {
         return GSON.toJson(modifiedResults);
     }
 
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "application/json" media type.
+     *
+     * @return String that will be returned as an application/json response.
+     */
+    @Path("daily/today")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getAggregatedTodayAvailability(@DefaultValue("false") @QueryParam("debug") String debug) {
+        int offset = 0;
+        return getAggregatedDayAvailabilityWithOffset(offset, debug);
+    }
+
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "application/json" media type.
+     *
+     * @return String that will be returned as an application/json response.
+     */
+    @Path("daily/yesterday")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getAggregatedYesterdayAvailability(@DefaultValue("false") @QueryParam("debug") String debug) {
+        int offset = 1;
+        return getAggregatedDayAvailabilityWithOffset(offset, debug);
+
+    }
+
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "application/json" media type.
+     *
+     * @return String that will be returned as an application/json response.
+     */
+    @Path("daily/day")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getAggregatedDayAvailability(@QueryParam("date") String full_day,
+                                     @DefaultValue("false") @QueryParam("debug") String debug) {
+
+        if (full_day == null) {
+            return GSON.toJson("Please supply date query parameter");
+        }
+
+        String[] data = full_day.split("-");
+        if (data.length != 3) {
+            return GSON.toJson("Incorrect date parameter. It should be of type YYYY-MM-DD");
+        }
+
+        DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        calendar.add(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        String currentDayString = formatter.format(calendar.getTime());
+
+        long offset;
+        try {
+            Date date1 = formatter.parse(currentDayString);
+            Date date2 = formatter.parse(full_day);
+            long diff = date1.getTime() - date2.getTime();
+            offset = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+            if (offset < 0) {
+                return GSON.toJson("Future date is not allowed.");
+            }
+        } catch (ParseException e) {
+            return GSON.toJson("Incorrect date parameter. It should be of type YYYY-MM-DD");
+        }
+
+        return getAggregatedDayAvailabilityWithOffset((int)offset, debug);
+    }
+
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "application/json" media type.
+     *
+     * @return String that will be returned as an application/json response.
+     */
+    @Path("daily/day-offset")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getAggregatedDayAvailabilityWithOffset(@QueryParam("offset") int offset,
+                                               @DefaultValue("false") @QueryParam("debug") String debug) {
+
+        String s = "";
+        s += "offset: " + offset + "\n";
+        s += "1\n";
+
+        if (offset < 0) {
+            return GSON.toJson("Future date is not allowed.");
+        }
+
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        calendar.add(Calendar.DAY_OF_MONTH, -1 * offset);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+
+        DateFormat formatter = new SimpleDateFormat("yyyyMMdd");
+        String conduitDay = formatter.format(calendar.getTime());
+
+        formatter = new SimpleDateFormat("yyyy-MM-dd");
+        String day = formatter.format(calendar.getTime());
+
+        String auditRequest = "";
+        String auditClick = "";
+        String auditRenderCPC = "";
+        String auditRenderCPM = "";
+        String auditBilling = "";
+
+        Connection c;
+        Statement stmt;
+        try {
+
+            s += "2\n";
+
+            s+= day + "\n";
+
+            Class.forName("org.postgresql.Driver");
+            c = DriverManager.getConnection("jdbc:postgresql://opmd4002.grid.hkg1.inmobi.com:5499/conduit_audit",
+                    "conduit_user", "C0n@uD!7+");
+            c.setAutoCommit(false);
+
+            stmt = c.createStatement();
+            ResultSet rs = stmt.executeQuery("select " +
+                    "sum(case when topic = 'rr' and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as request, " +
+                    "sum(case when (topic like '%network_click_cp%_lhr1' or topic like '%network_click_cp%_uh1' or topic like '%network_click_cp%_hkg1' or topic like '%network_click_cp%_dfw1' or topic like '%network_click_invalid_lhr1' or topic like '%network_click_invalid_uh1' or topic like '%network_click_invalid_hkg1' or topic like '%network_click_invalid_dfw1') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as click, " +
+                    "sum(case when (topic like 'beacon_rr_lhr1_cpc_render' or topic like 'beacon_rr_uh1_cpc_render' or topic like 'beacon_rr_hkg1_cpc_render' or topic like 'beacon_rr_dfw1_cpc_render') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as rendercpc, " +
+                    "sum(case when (topic like 'beacon_rr_lhr1_cpm_render' or topic like 'beacon_rr_uh1_cpm_render' or topic like 'beacon_rr_hkg1_cpm_render' or topic like 'beacon_rr_dfw1_cpm_render') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as rendercpm, " +
+                    "sum(case when (topic like 'billing_cp%_lhr1' or topic like 'billing_cp%_uh1' or topic like 'billing_cp%_hkg1' or topic like 'billing_cp%_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as billing " +
+                    "from daily_conduit_summary" + conduitDay + ";");
+
+            s += "3\n";
+            while ( rs.next() ) {
+                s += "4\n";
+                auditRequest = rs.getString("request");
+                auditClick = rs.getString("click");
+                auditRenderCPC = rs.getString("rendercpc");
+                auditRenderCPM = rs.getString("rendercpm");
+                auditBilling = rs.getString("billing");
+
+                auditRequest = modifyIfBlank(auditRequest);
+                auditClick = modifyIfBlank(auditClick);
+                auditRenderCPC = modifyIfBlank(auditRenderCPC);
+                auditRenderCPM = modifyIfBlank(auditRenderCPM);
+                auditBilling = modifyIfBlank(auditBilling);
+
+                s += "5\n";
+            }
+            rs.close();
+            stmt.close();
+            c.close();
+        } catch ( Exception e ) {
+            e.printStackTrace();
+            s += e.getMessage() + "\n";
+            s += "6\n";
+        }
+
+        String verticaRequest = "";
+        String verticaClick = "";
+        String verticaRenderCPC = "";
+        String verticaRenderCPM = "";
+        String verticaBilling = "";
+        Connection conn;
+        try {
+            Class.forName("com.vertica.Driver");
+            conn = DriverManager.getConnection
+                    ("jdbc:vertica://db1001.ver.uh1.inmobi.com:5433/verticadb", "verticauser", "vtwrite#123");
+
+            Statement mySelect = conn.createStatement();
+            ResultSet myResult = mySelect.executeQuery
+                    ("select sum(request_stream_count) as request,sum(click_stream_count) as click," +
+                            "sum(rendered_stream_count_cpc) as rendercpc,sum(rendered_stream_count_cpm) as rendercpm," +
+                            "sum(billing_stream_count) as billing from unified_reporting_summary where event_time >= '"+ day +
+                            " 00:00:00' and event_time <= '" + day + " 23:00:00';");
+
+            s += "7\n";
+            while (myResult.next()) {
+                s += "8\n";
+                verticaRequest = myResult.getString(1);
+                verticaClick = myResult.getString(2);
+                verticaRenderCPC = myResult.getString(3);
+                verticaRenderCPM = myResult.getString(4);
+                verticaBilling = myResult.getString(5);
+
+                verticaRequest = modifyIfBlank(verticaRequest);
+                verticaClick = modifyIfBlank(verticaClick);
+                verticaRenderCPC = modifyIfBlank(verticaRenderCPC);
+                verticaRenderCPM = modifyIfBlank(verticaRenderCPM);
+                verticaBilling = modifyIfBlank(verticaBilling);
+
+                s += "81\n";
+            }
+            mySelect.close();
+            conn.close();
+        } catch (Exception e) {
+            s += "84\n";
+            e.printStackTrace();
+        }
+
+
+        Result result = new Result(day, auditRequest, auditClick, auditRenderCPC, auditRenderCPM,
+                auditBilling, "0", "0", "0", "0", "0", "NA", "NA", "NA", "NA", "NA");
+
+        result.setVerticaRequest(verticaRequest);
+        result.setVerticaClick(verticaClick);
+        result.setVerticaRenderCPC(verticaRenderCPC);
+        result.setVerticaRenderCPM(verticaRenderCPM);
+        result.setVerticaBilling(verticaBilling);
+
+        result.setRequestAvailability(calculate(result.getAuditRequest(), result.getVerticaRequest()));
+        result.setClickAvailability(calculate(result.getAuditClick(), result.getVerticaClick()));
+        result.setRenderCPCAvailability(calculate(result.getAuditRenderCPC(), result.getVerticaRenderCPC()));
+        result.setRenderCPMAvailability(calculate(result.getAuditRenderCPM(), result.getVerticaRenderCPM()));
+        result.setBillingAvailability(calculate(result.getAuditBilling(), result.getVerticaBilling()));
+
+        if (debug.equals("true")) {
+            return GSON.toJson(result);
+        }
+
+
+        ModifiedResult modifiedResult = new ModifiedResult(result.getDate(), result.getVerticaRequest(),
+                result.getVerticaClick(), result.getVerticaRenderCPC(), result.getVerticaRenderCPM(),
+                result.getVerticaBilling());
+
+        modifiedResult.setRequestAvailability(modifyCalculate(result.getAuditRequest(), result.getVerticaRequest()));
+        modifiedResult.setClickAvailability(modifyCalculate(result.getAuditClick(), result.getVerticaClick()));
+        modifiedResult.setRenderCPCAvailability(modifyCalculate(result.getAuditRenderCPC(), result.getVerticaRenderCPC()));
+        modifiedResult.setRenderCPMAvailability(modifyCalculate(result.getAuditRenderCPM(), result.getVerticaRenderCPM()));
+        modifiedResult.setBillingAvailability(modifyCalculate(result.getAuditBilling(), result.getVerticaBilling()));
+
+        return GSON.toJson(modifiedResult);
+    }
+
     private String modifyIfBlank(String input) {
         if (StringUtils.isBlank(input)) {
             return "0";
@@ -302,6 +539,8 @@ public class DataPopulatorAPI {
             return input;
         }
     }
+
+
 
     private String calculate(String start, String end) {
         String availability = "NA";
