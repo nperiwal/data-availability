@@ -48,6 +48,13 @@ public class MyResource {
 
     }
 
+    @Path("test")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String test() {
+        return GSON.toJson(AvailabilityCacheStore.unifiedCacheStore);
+    }
+
     /**
      * Method handling HTTP GET requests. The returned object will be sent
      * to the client as "application/json" media type.

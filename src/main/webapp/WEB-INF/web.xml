@@ -15,4 +15,7 @@
         <servlet-name>Jersey Web Application</servlet-name>
         <url-pattern>/api/*</url-pattern>
     </servlet-mapping>
+    <listener>
+        <listener-class>com.inmobi.firstapp.AvailabilityCacheStore</listener-class>
+    </listener>
 </web-app>
