@@ -54,11 +54,15 @@ public class DataPopulatorAPI {
                                       @QueryParam("fact_tag") String factTag,
                                       @QueryParam("measure_tag") Set<String> measureTag) {
 
+        Map<String, Map<Date, Float>> result = new HashMap<>();
         DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
         formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
         if (factTag.equals(UNIFIED_TAG)) {
             Map<String, Map<Date, Float>> unifiedCompletenessCache = AvailabilityCacheStore.getUnifiedCacheStore();
-
+            if (unifiedCompletenessCache == null) {
+                System.out.println("Cache data not available currently");
+                return null;
+            }
             Calendar start = Calendar.getInstance();
             start.setTimeZone(TimeZone.getTimeZone("UTC"));
             start.setTimeInMillis(Long.parseLong(startDate));
@@ -66,14 +70,17 @@ public class DataPopulatorAPI {
             end.setTimeZone(TimeZone.getTimeZone("UTC"));
             end.setTimeInMillis(Long.parseLong(endDate));
 
-            Map<String, Map<Date, Float>> result = new HashMap<>();
             for (String tag : measureTag) {
                 while(start.before(end)) {
                     Date date = start.getTime();
                     if (result.get(tag) == null) {
                         result.put(tag, new HashMap<Date, Float>());
                     }
-                    result.get(tag).put(date, unifiedCompletenessCache.get(tag).get(date));
+                    if (unifiedCompletenessCache.containsKey(tag) && unifiedCompletenessCache.get(tag) != null &&
+                            unifiedCompletenessCache.get(tag).containsKey(date)) {
+                        result.get(tag).put(date, unifiedCompletenessCache.get(tag).get(date) == null? 0f :
+                                unifiedCompletenessCache.get(tag).get(date));
+                    }
                     start.add(Calendar.HOUR_OF_DAY, 1);
                 }
             }
