@@ -101,10 +101,12 @@ public class AvailabilityCacheStore extends TimerTask implements ServletContextL
             case CLICK:
                 response = result.getClickAvailability();
                 break;
-            case CONVERSION:
-                return "0";
             case BILLING:
                 response = result.getBillingAvailability();
+                break;
+            case CONVERSION:
+                response = result.getConversionAvailability();
+                break;
         }
 
         if (!response.equals("NA")) {

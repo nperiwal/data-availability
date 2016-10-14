@@ -36,7 +36,7 @@ public class DataPopulatorAPI {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public String getCompletenessCacheDump() {
-        return GSON.toJson(AvailabilityCacheStore.unifiedCacheStore);
+        return GSON.toJson(AvailabilityCacheStore.getUnifiedCacheStore());
     }
 
     /**
@@ -205,6 +205,7 @@ public class DataPopulatorAPI {
         String auditClick = "";
         String auditRender = "";
         String auditBilling = "";
+        String auditConversion = "";
 
         Connection c;
         Statement stmt;
@@ -224,7 +225,8 @@ public class DataPopulatorAPI {
                     "sum(case when topic = 'rr' and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as request, " +
                     "sum(case when (topic like '%network_click_cp%_lhr1' or topic like '%network_click_cp%_uh1' or topic like '%network_click_cp%_hkg1' or topic like '%network_click_cp%_dfw1' or topic like '%network_click_invalid_lhr1' or topic like '%network_click_invalid_uh1' or topic like '%network_click_invalid_hkg1' or topic like '%network_click_invalid_dfw1') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as click, " +
                     "sum(case when (topic like 'beacon_rr_lhr1_cp%_render' or topic like 'beacon_rr_uh1_cp%_render' or topic like 'beacon_rr_hkg1_cp%_render' or topic like 'beacon_rr_dfw1_cp%_render') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as render, " +
-                    "sum(case when (topic like 'billing_cp%_lhr1' or topic like 'billing_cp%_uh1' or topic like 'billing_cp%_hkg1' or topic like 'billing_cp%_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as billing " +
+                    "sum(case when (topic like 'billing_cp%_lhr1' or topic like 'billing_cp%_uh1' or topic like 'billing_cp%_hkg1' or topic like 'billing_cp%_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as billing, " +
+                    "sum(case when (topic like 'adroit_report_obj_lhr1' or topic like 'adroit_report_obj_uh1' or topic like 'adroit_report_obj_hkg1' or topic like 'adroit_report_obj_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as conversion " +
                     "from daily_conduit_summary" + conduitDay + " group by (timeinterval/(1000*60*60))%24 order by (timeinterval/(1000*60*60))%24;");
 
             s += "3\n";
@@ -235,16 +237,18 @@ public class DataPopulatorAPI {
                 auditClick = rs.getString("click");
                 auditRender = rs.getString("render");
                 auditBilling = rs.getString("billing");
+                auditConversion = rs.getString("conversion");
 
                 auditRequest = modifyIfBlank(auditRequest);
                 auditClick = modifyIfBlank(auditClick);
                 auditRender = modifyIfBlank(auditRender);
                 auditBilling = modifyIfBlank(auditBilling);
+                auditConversion = modifyIfBlank(auditConversion);
 
                 calendar.set(Calendar.HOUR_OF_DAY, hour);
                 fullHour = formatter.format(calendar.getTime());
-                Result result = new Result(fullHour, auditRequest, auditClick, auditRender, auditBilling, "0", "0",
-                        "0", "0", "NA", "NA", "NA", "NA");
+                Result result = new Result(fullHour, auditRequest, auditClick, auditRender, auditBilling,
+                        auditConversion, "0", "0", "0", "0", "0", "NA", "NA", "NA", "NA", "NA");
                 resultMap.put(fullHour, result);
                 s += "5\n";
             }
@@ -261,6 +265,7 @@ public class DataPopulatorAPI {
         String verticaClick = "";
         String verticaRender = "";
         String verticaBilling = "";
+        String verticaConversion = "";
         Connection conn;
         try {
             Class.forName("com.vertica.Driver");
@@ -269,10 +274,10 @@ public class DataPopulatorAPI {
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
-                    ("select process_time,sum(request_stream_count) as request,sum(click_stream_count) as click," +
-                            "sum(rendered_stream_count_cpc)+sum(rendered_stream_count_cpm) as render," +
-                            "sum(billing_stream_count) as billing from unified_reporting_summary where process_time >= '"+ day +
-                            " 00:00:00' and process_time <= '" + day + " 23:00:00' group by process_time order by process_time;");
+                    ("select event_received_time,sum(request_stream_count) as request,sum(click_stream_count) as click," +
+                            "sum(render_stream_count) as render, sum(billing_stream_count) as billing," +
+                            "sum(conversion_stream_count) as conversion from unified_availability_summary where event_received_time >= '"+ day +
+                            " 00:00:00' and event_received_time <= '" + day + " 23:00:00' group by event_received_time order by event_received_time;");
 
             s += "7\n";
             while (myResult.next()) {
@@ -283,11 +288,13 @@ public class DataPopulatorAPI {
                 verticaClick = myResult.getString(3);
                 verticaRender = myResult.getString(4);
                 verticaBilling = myResult.getString(5);
+                verticaConversion = myResult.getString(6);
 
                 verticaRequest = modifyIfBlank(verticaRequest);
                 verticaClick = modifyIfBlank(verticaClick);
                 verticaRender = modifyIfBlank(verticaRender);
                 verticaBilling = modifyIfBlank(verticaBilling);
+                verticaConversion = modifyIfBlank(verticaConversion);
 
                 calendar.set(Calendar.HOUR_OF_DAY, hour);
                 fullHour = formatter.format(calendar.getTime());
@@ -297,6 +304,7 @@ public class DataPopulatorAPI {
                 result.setVerticaClick(verticaClick);
                 result.setVerticaRender(verticaRender);
                 result.setVerticaBilling(verticaBilling);
+                result.setVerticaConversion(verticaConversion);
 
                 s += "81\n";
             }
@@ -315,8 +323,8 @@ public class DataPopulatorAPI {
                 result.setRequestAvailability(calculate(result.getAuditRequest(), result.getVerticaRequest()));
                 result.setClickAvailability(calculate(result.getAuditClick(), result.getVerticaClick()));
                 result.setRenderAvailability(calculate(result.getAuditRender(), result.getVerticaRender()));
-                result.setRenderAvailability(calculate(result.getAuditRender(), result.getVerticaRender()));
                 result.setBillingAvailability(calculate(result.getAuditBilling(), result.getVerticaBilling()));
+                result.setConversionAvailability(calculate(result.getAuditConversion(), result.getVerticaConversion()));
 
                 resultList.add(result);
             }
@@ -328,12 +336,14 @@ public class DataPopulatorAPI {
             Result result = entry.getValue();
 
             ModifiedResult modifiedResult = new ModifiedResult(result.getDate(), result.getVerticaRequest(),
-                    result.getVerticaClick(), result.getVerticaRender(), result.getVerticaBilling());
+                    result.getVerticaClick(), result.getVerticaRender(), result.getVerticaBilling(),
+                    result.getVerticaConversion());
 
             modifiedResult.setRequestAvailability(modifyCalculate(result.getAuditRequest(), result.getVerticaRequest()));
             modifiedResult.setClickAvailability(modifyCalculate(result.getAuditClick(), result.getVerticaClick()));
             modifiedResult.setRenderAvailability(modifyCalculate(result.getAuditRender(), result.getVerticaRender()));
             modifiedResult.setBillingAvailability(modifyCalculate(result.getAuditBilling(), result.getVerticaBilling()));
+            modifiedResult.setConversionAvailability(modifyCalculate(result.getAuditConversion(), result.getVerticaConversion()));
 
             modifiedResults.add(modifiedResult);
         }
@@ -451,6 +461,7 @@ public class DataPopulatorAPI {
         String auditClick = "";
         String auditRender = "";
         String auditBilling = "";
+        String auditConversion = "";
 
         Connection c;
         Statement stmt;
@@ -470,7 +481,8 @@ public class DataPopulatorAPI {
                     "sum(case when topic = 'rr' and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as request, " +
                     "sum(case when (topic like '%network_click_cp%_lhr1' or topic like '%network_click_cp%_uh1' or topic like '%network_click_cp%_hkg1' or topic like '%network_click_cp%_dfw1' or topic like '%network_click_invalid_lhr1' or topic like '%network_click_invalid_uh1' or topic like '%network_click_invalid_hkg1' or topic like '%network_click_invalid_dfw1') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as click, " +
                     "sum(case when (topic like 'beacon_rr_lhr1_cp%_render' or topic like 'beacon_rr_uh1_cp%_render' or topic like 'beacon_rr_hkg1_cp%_render' or topic like 'beacon_rr_dfw1_cp%_render') and tier='LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as render, " +
-                    "sum(case when (topic like 'billing_cp%_lhr1' or topic like 'billing_cp%_uh1' or topic like 'billing_cp%_hkg1' or topic like 'billing_cp%_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as billing " +
+                    "sum(case when (topic like 'billing_cp%_lhr1' or topic like 'billing_cp%_uh1' or topic like 'billing_cp%_hkg1' or topic like 'billing_cp%_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as billing, " +
+                    "sum(case when (topic like 'adroit_report_obj_lhr1' or topic like 'adroit_report_obj_uh1' or topic like 'adroit_report_obj_hkg1' or topic like 'adroit_report_obj_dfw1') and tier = 'LOCAL' then (c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c15 + c30 + c60 + c120 + c240 + c600) end) as conversion " +
                     "from daily_conduit_summary" + conduitDay + ";");
 
             s += "3\n";
@@ -480,11 +492,13 @@ public class DataPopulatorAPI {
                 auditClick = rs.getString("click");
                 auditRender = rs.getString("render");
                 auditBilling = rs.getString("billing");
+                auditConversion = rs.getString("conversion");
 
                 auditRequest = modifyIfBlank(auditRequest);
                 auditClick = modifyIfBlank(auditClick);
                 auditRender = modifyIfBlank(auditRender);
                 auditBilling = modifyIfBlank(auditBilling);
+                auditConversion = modifyIfBlank(auditConversion);
 
                 s += "5\n";
             }
@@ -501,6 +515,7 @@ public class DataPopulatorAPI {
         String verticaClick = "";
         String verticaRender = "";
         String verticaBilling = "";
+        String verticaConversion = "";
         Connection conn;
         try {
             Class.forName("com.vertica.Driver");
@@ -510,9 +525,9 @@ public class DataPopulatorAPI {
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
                     ("select sum(request_stream_count) as request,sum(click_stream_count) as click," +
-                            "sum(rendered_stream_count_cpc)+sum(rendered_stream_count_cpm) as render," +
-                            "sum(billing_stream_count) as billing from unified_reporting_summary where event_time >= '"+ day +
-                            " 00:00:00' and event_time <= '" + day + " 23:00:00';");
+                            "sum(render_stream_count) as render, sum(billing_stream_count) as billing," +
+                            "sum(conversion_stream_count) as conversion from unified_availability_summary where event_received_time >= '"+ day +
+                            " 00:00:00' and event_received_time <= '" + day + " 23:00:00';");
 
             s += "7\n";
             while (myResult.next()) {
@@ -521,11 +536,13 @@ public class DataPopulatorAPI {
                 verticaClick = myResult.getString(2);
                 verticaRender = myResult.getString(3);
                 verticaBilling = myResult.getString(4);
+                verticaConversion = myResult.getString(5);
 
                 verticaRequest = modifyIfBlank(verticaRequest);
                 verticaClick = modifyIfBlank(verticaClick);
                 verticaRender = modifyIfBlank(verticaRender);
                 verticaBilling = modifyIfBlank(verticaBilling);
+                verticaConversion = modifyIfBlank(verticaConversion);
 
                 s += "81\n";
             }
@@ -537,18 +554,20 @@ public class DataPopulatorAPI {
         }
 
 
-        Result result = new Result(day, auditRequest, auditClick, auditRender, auditBilling, "0", "0", "0", "0", "NA",
-                "NA", "NA", "NA");
+        Result result = new Result(day, auditRequest, auditClick, auditRender, auditBilling, auditConversion,
+                "0", "0", "0", "0", "0", "NA", "NA", "NA", "NA", "NA");
 
         result.setVerticaRequest(verticaRequest);
         result.setVerticaClick(verticaClick);
         result.setVerticaRender(verticaRender);
         result.setVerticaBilling(verticaBilling);
+        result.setVerticaConversion(verticaConversion);
 
         result.setRequestAvailability(calculate(result.getAuditRequest(), result.getVerticaRequest()));
         result.setClickAvailability(calculate(result.getAuditClick(), result.getVerticaClick()));
         result.setRenderAvailability(calculate(result.getAuditRender(), result.getVerticaRender()));
         result.setBillingAvailability(calculate(result.getAuditBilling(), result.getVerticaBilling()));
+        result.setConversionAvailability(calculate(result.getAuditConversion(), result.getVerticaConversion()));
 
         if (debug.equals("true")) {
             return GSON.toJson(result);
@@ -556,12 +575,14 @@ public class DataPopulatorAPI {
 
 
         ModifiedResult modifiedResult = new ModifiedResult(result.getDate(), result.getVerticaRequest(),
-                result.getVerticaClick(), result.getVerticaRender(), result.getVerticaBilling());
+                result.getVerticaClick(), result.getVerticaRender(), result.getVerticaBilling(),
+                result.getVerticaConversion());
 
         modifiedResult.setRequestAvailability(modifyCalculate(result.getAuditRequest(), result.getVerticaRequest()));
         modifiedResult.setClickAvailability(modifyCalculate(result.getAuditClick(), result.getVerticaClick()));
         modifiedResult.setRenderAvailability(modifyCalculate(result.getAuditRender(), result.getVerticaRender()));
         modifiedResult.setBillingAvailability(modifyCalculate(result.getAuditBilling(), result.getVerticaBilling()));
+        modifiedResult.setConversionAvailability(modifyCalculate(result.getAuditConversion(), result.getVerticaConversion()));
 
         return GSON.toJson(modifiedResult);
     }
@@ -611,14 +632,17 @@ public class DataPopulatorAPI {
         String auditClick;
         String auditRender;
         String auditBilling;
+        String auditConversion;
         String verticaRequest;
         String verticaClick;
         String verticaRender;
         String verticaBilling;
+        String verticaConversion;
         String requestAvailability;
         String clickAvailability;
         String renderAvailability;
         String billingAvailability;
+        String conversionAvailability;
 
         public void setVerticaRequest(String verticaRequest) {
             this.verticaRequest = verticaRequest;
@@ -636,6 +660,10 @@ public class DataPopulatorAPI {
             this.verticaBilling = verticaBilling;
         }
 
+        public void setVerticaConversion(String verticaConversion) {
+            this.verticaConversion = verticaConversion;
+        }
+
         public void setRequestAvailability(String requestAvailability) {
             this.requestAvailability = requestAvailability;
         }
@@ -650,6 +678,10 @@ public class DataPopulatorAPI {
 
         public void setBillingAvailability(String billingAvailability) {
             this.billingAvailability = billingAvailability;
+        }
+
+        public void setConversionAvailability(String conversionAvailability) {
+            this.conversionAvailability = conversionAvailability;
         }
 
         public String getDate() {
@@ -672,6 +704,10 @@ public class DataPopulatorAPI {
             return auditBilling;
         }
 
+        public String getAuditConversion() {
+            return auditConversion;
+        }
+
         public String getVerticaRequest() {
             return verticaRequest;
         }
@@ -686,6 +722,10 @@ public class DataPopulatorAPI {
 
         public String getVerticaBilling() {
             return verticaBilling;
+        }
+
+        public String getVerticaConversion() {
+            return verticaConversion;
         }
 
         public String getRequestAvailability() {
@@ -704,23 +744,31 @@ public class DataPopulatorAPI {
             return billingAvailability;
         }
 
-        public Result(String date, String auditRequest, String auditClick, String auditRender, String auditBilling, String verticaRequest, String verticaClick,
-                      String verticaRender, String verticaBilling, String requestAvailability,
-                      String clickAvailability, String renderAvailability,
-                      String billingAvailability) {
+        public String getConversionAvailability() {
+            return conversionAvailability;
+        }
+
+        public Result(String date, String auditRequest, String auditClick, String auditRender, String auditBilling,
+                      String auditConversion, String verticaRequest, String verticaClick, String verticaRender,
+                      String verticaBilling, String verticaConversion, String requestAvailability,
+                      String clickAvailability, String renderAvailability, String billingAvailability,
+                      String conversionAvailability) {
             this.date = date;
             this.auditRequest = auditRequest;
             this.auditClick = auditClick;
             this.auditRender = auditRender;
             this.auditBilling = auditBilling;
+            this.auditConversion = auditConversion;
             this.verticaRequest = verticaRequest;
             this.verticaClick = verticaClick;
             this.verticaRender = verticaRender;
             this.verticaBilling = verticaBilling;
+            this.verticaConversion = verticaConversion;
             this.requestAvailability = requestAvailability;
             this.clickAvailability = clickAvailability;
             this.renderAvailability = renderAvailability;
             this.billingAvailability = billingAvailability;
+            this.conversionAvailability = conversionAvailability;
         }
     }
 
@@ -730,18 +778,21 @@ public class DataPopulatorAPI {
         String verticaClick;
         String verticaRender;
         String verticaBilling;
+        String verticaConversion;
         String requestAvailability;
         String clickAvailability;
         String renderAvailability;
         String billingAvailability;
+        String conversionAvailability;
 
         public ModifiedResult(String date, String verticaRequest, String verticaClick, String verticaRender,
-                              String verticaBilling) {
+                              String verticaBilling, String verticaConversion) {
             this.date = date;
             this.verticaRequest = verticaRequest;
             this.verticaClick = verticaClick;
             this.verticaRender = verticaRender;
             this.verticaBilling = verticaBilling;
+            this.verticaConversion = verticaConversion;
         }
 
         public void setRequestAvailability(String requestAvailability) {
@@ -758,6 +809,10 @@ public class DataPopulatorAPI {
 
         public void setBillingAvailability(String billingAvailability) {
             this.billingAvailability = billingAvailability;
+        }
+
+        public void setConversionAvailability(String conversionAvailability) {
+            this.conversionAvailability = conversionAvailability;
         }
     }
 
