@@ -28,6 +28,19 @@ public class DataPopulatorAPI {
 
     /**
      * Method handling HTTP GET requests. The returned object will be sent
+     * to the client as "text/plain" media type.
+     *
+     * @return String that will be returned as a text/plain response.
+     */
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String getIt() {
+        return GSON.toJson("Welcome to Data availability Dashboard. Currently in Construction Phase!");
+
+    }
+
+    /**
+     * Method handling HTTP GET requests. The returned object will be sent
      * to the client as "application/json" media type.
      *
      * @return Gives the Data Completeness Cache Dump
@@ -270,13 +283,13 @@ public class DataPopulatorAPI {
         try {
             Class.forName("com.vertica.Driver");
             conn = DriverManager.getConnection
-                    ("jdbc:vertica://db1001.ver.uh1.inmobi.com:5433/verticadb", "verticauser", "vtwrite#123");
+                    ("jdbc:vertica://verticadb.uh1.inmobi.com:5433/verticadb", "hdfsload", "haswe4725load");
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
                     ("select event_received_time,sum(request_stream_count) as request,sum(click_stream_count) as click," +
                             "sum(render_stream_count) as render, sum(billing_stream_count) as billing," +
-                            "sum(conversion_stream_count) as conversion from unified_availability_summary where event_received_time >= '"+ day +
+                            "sum(conversion_stream_count) as conversion from day_unified_availability_fact_v where event_received_time >= '"+ day +
                             " 00:00:00' and event_received_time <= '" + day + " 23:00:00' group by event_received_time order by event_received_time;");
 
             s += "7\n";
@@ -520,13 +533,13 @@ public class DataPopulatorAPI {
         try {
             Class.forName("com.vertica.Driver");
             conn = DriverManager.getConnection
-                    ("jdbc:vertica://db1001.ver.uh1.inmobi.com:5433/verticadb", "verticauser", "vtwrite#123");
+                    ("jdbc:vertica://verticadb.uh1.inmobi.com:5433/verticadb", "hdfsload", "haswe4725load");
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
                     ("select sum(request_stream_count) as request,sum(click_stream_count) as click," +
                             "sum(render_stream_count) as render, sum(billing_stream_count) as billing," +
-                            "sum(conversion_stream_count) as conversion from unified_availability_summary where event_received_time >= '"+ day +
+                            "sum(conversion_stream_count) as conversion from day_unified_availability_fact_v where event_received_time >= '"+ day +
                             " 00:00:00' and event_received_time <= '" + day + " 23:00:00';");
 
             s += "7\n";
