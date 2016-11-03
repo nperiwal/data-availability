@@ -18,4 +18,7 @@
     <listener>
         <listener-class>com.inmobi.firstapp.AvailabilityCacheStore</listener-class>
     </listener>
+    <listener>
+        <listener-class>com.inmobi.firstapp.PurgeCacheStore</listener-class>
+    </listener>
 </web-app>

@@ -9,10 +9,11 @@ import javax.servlet.ServletContextListener;
 import java.lang.reflect.Type;
 import java.text.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class AvailabilityCacheStore extends TimerTask implements ServletContextListener {
 
-      enum Stream {
+   enum Stream {
 
         REQUEST("request"),
         CLICK("click"),
@@ -22,7 +23,7 @@ public class AvailabilityCacheStore extends TimerTask implements ServletContextL
 
         private final String name;
 
-        private Stream(String s) {
+        Stream(String s) {
             this.name = s;
         }
 
@@ -31,7 +32,7 @@ public class AvailabilityCacheStore extends TimerTask implements ServletContextL
         }
     }
 
-    public static Map<String, Map<Date, Float>> unifiedCacheStore = new HashMap<>();
+    public static Map<String, Map<Date, Float>> unifiedCacheStore = new ConcurrentHashMap<>();
 
     public static final long ONE_SECOND = 1000;
     public static final long THIRTY_MINUTE = 30 * 60 * ONE_SECOND;
@@ -44,7 +45,7 @@ public class AvailabilityCacheStore extends TimerTask implements ServletContextL
     public static void main(String args[]) {
         timerTask = new AvailabilityCacheStore();
         Timer timer = new Timer();
-        timer.schedule(timerTask, ONE_SECOND, THIRTY_MINUTE);
+        timer.schedule(timerTask, THIRTY_MINUTE, THIRTY_MINUTE);
     }
 
     @Override
@@ -78,7 +79,7 @@ public class AvailabilityCacheStore extends TimerTask implements ServletContextL
             try {
                 for (Stream stream : Stream.values()) {
                     if (unifiedCacheStore.get(stream.getName()) == null) {
-                        unifiedCacheStore.put(stream.getName(), new TreeMap<Date, Float>());
+                        unifiedCacheStore.put(stream.getName(), new ConcurrentSkipListMap<Date, Float>());
                     }
                     unifiedCacheStore.get(stream.getName()).put(formatter.parse(result.getDate()),
                             Float.parseFloat(modify(result, stream)));
@@ -118,13 +119,14 @@ public class AvailabilityCacheStore extends TimerTask implements ServletContextL
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
-        System.out.println("ServletContextListener started");
+        System.out.println("AvailabilityCacheStore: ServletContextListener started");
+        completeTask(5);
         main(null);
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        System.out.println("ServletContextListener destroyed");
+        System.out.println("AvailabilityCacheStore: ServletContextListener destroyed");
         if (timerTask != null) {
             timerTask.cancel();
         }

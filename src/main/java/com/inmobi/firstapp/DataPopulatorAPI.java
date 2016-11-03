@@ -65,41 +65,55 @@ public class DataPopulatorAPI {
     public String getDataCompleteness(@QueryParam("start_date") String startDate,
                                       @QueryParam("end_date") String endDate,
                                       @QueryParam("fact_tag") String factTag,
-                                      @QueryParam("measure_tag") Set<String> measureTag) {
+                                      @QueryParam("measure_tag") String measureTagString) {
 
-        Map<String, Map<Date, Float>> result = new HashMap<>();
-        DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        Map<String, Map<String, Float>> result = new HashMap<>();
+        DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd-HH");
         formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+        if (startDate == null || endDate == null || factTag == null || measureTagString == null) {
+            return GSON.toJson(result);
+        }
+        Set<String> measureTag = new HashSet<>(Arrays.asList(measureTagString.split(",")));
         if (factTag.equals(UNIFIED_TAG)) {
             Map<String, Map<Date, Float>> unifiedCompletenessCache = AvailabilityCacheStore.getUnifiedCacheStore();
             if (unifiedCompletenessCache == null) {
                 System.out.println("Cache data not available currently");
-                return null;
+                return GSON.toJson(result);
             }
             Calendar start = Calendar.getInstance();
             start.setTimeZone(TimeZone.getTimeZone("UTC"));
-            start.setTimeInMillis(Long.parseLong(startDate));
+            try {
+                start.setTime(formatter.parse(startDate));
+            } catch (ParseException e) {
+                e.printStackTrace();
+                System.out.println("");
+                return GSON.toJson(result);
+            }
             Calendar end = Calendar.getInstance();
             end.setTimeZone(TimeZone.getTimeZone("UTC"));
-            end.setTimeInMillis(Long.parseLong(endDate));
+            try {
+                end.setTime(formatter.parse(endDate));
+            } catch (ParseException e) {
+                e.printStackTrace();
+                return GSON.toJson(result);
+            }
 
-            for (String tag : measureTag) {
-                while(start.before(end)) {
-                    Date date = start.getTime();
-                    if (result.get(tag) == null) {
-                        result.put(tag, new HashMap<Date, Float>());
-                    }
+            while(start.before(end)) {
+                Date date = start.getTime();
+                for (String tag : measureTag) {
                     if (unifiedCompletenessCache.containsKey(tag) && unifiedCompletenessCache.get(tag) != null &&
                             unifiedCompletenessCache.get(tag).containsKey(date)) {
-                        result.get(tag).put(date, unifiedCompletenessCache.get(tag).get(date) == null? 0f :
+                        if (result.get(tag) == null) {
+                            result.put(tag, new TreeMap<String, Float>());
+                        }
+                        result.get(tag).put(formatter.format(date), unifiedCompletenessCache.get(tag).get(date) == null? 0f :
                                 unifiedCompletenessCache.get(tag).get(date));
                     }
-                    start.add(Calendar.HOUR_OF_DAY, 1);
                 }
+                start.add(Calendar.HOUR_OF_DAY, 1);
             }
-            return GSON.toJson(result);
         }
-        return null;
+        return GSON.toJson(result);
     }
 
     /**
