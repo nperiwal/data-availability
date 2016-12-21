@@ -21,7 +21,7 @@ public class PurgeCacheStore extends TimerTask implements ServletContextListener
 
     @Override
     public void run() {
-        int RETENTION_DAYS = 4;
+        int RETENTION_DAYS = 5;
         System.out.println("Purge Task started at:" + new Date());
         purgeStore(RETENTION_DAYS);
         System.out.println("Purge Task finished at:" + new Date());

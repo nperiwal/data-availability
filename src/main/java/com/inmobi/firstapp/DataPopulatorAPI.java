@@ -297,7 +297,7 @@ public class DataPopulatorAPI {
         try {
             Class.forName("com.vertica.Driver");
             conn = DriverManager.getConnection
-                    ("jdbc:vertica://verticadb.uh1.inmobi.com:5433/verticadb", "hdfsload", "haswe4725load");
+                    ("jdbc:vertica://verticadb.uh1.inmobi.com:5433/verticadb", "data_w", "#data%w256");
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery
@@ -547,7 +547,7 @@ public class DataPopulatorAPI {
         try {
             Class.forName("com.vertica.Driver");
             conn = DriverManager.getConnection
-                    ("jdbc:vertica://verticadb.uh1.inmobi.com:5433/verticadb", "hdfsload", "haswe4725load");
+                    ("jdbc:vertica://verticadb.uh1.inmobi.com:5433/verticadb", "data_w", "#data%w256");
 
             Statement mySelect = conn.createStatement();
             ResultSet myResult = mySelect.executeQuery

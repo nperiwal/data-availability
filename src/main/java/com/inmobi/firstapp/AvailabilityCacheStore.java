@@ -51,7 +51,7 @@ public class AvailabilityCacheStore extends TimerTask implements ServletContextL
     @Override
     public void run() {
         System.out.println("Task started at:" + new Date());
-        completeTask(2);
+        completeTask(3);
         System.out.println("Task finished at:" + new Date());
     }
 
