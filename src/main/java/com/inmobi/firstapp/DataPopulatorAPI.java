@@ -327,11 +327,13 @@ public class DataPopulatorAPI {
                 fullHour = formatter.format(calendar.getTime());
                 Result result = resultMap.get(fullHour);
 
-                result.setVerticaRequest(verticaRequest);
-                result.setVerticaClick(verticaClick);
-                result.setVerticaRender(verticaRender);
-                result.setVerticaBilling(verticaBilling);
-                result.setVerticaConversion(verticaConversion);
+                if (result != null) {
+                    result.setVerticaRequest(verticaRequest);
+                    result.setVerticaClick(verticaClick);
+                    result.setVerticaRender(verticaRender);
+                    result.setVerticaBilling(verticaBilling);
+                    result.setVerticaConversion(verticaConversion);
+                }
 
                 s += "81\n";
             }
